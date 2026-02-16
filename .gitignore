@@ -1,0 +1,37 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env
+env/
+venv/
+.venv/
+
+# Python (Backend)
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/.pytest_cache/
+**/backend/venv/
+**/backend/.venv/
+
+# Node.js (Frontend)
+**/node_modules/
+**/frontend/.next/
+**/frontend/out/
+**/frontend/build/
+**/frontend/dist/
+.npm
+**/.vercel
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite
