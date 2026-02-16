@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://139.59.67.81:6000/api';
+const API_URL = 'https://butiahj.framesense.ai/api';
 
 export const generateChecks = async (rawText) => {
     const response = await axios.post(`${API_URL}/generate-checks`, {
