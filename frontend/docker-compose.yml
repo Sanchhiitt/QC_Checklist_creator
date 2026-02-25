@@ -7,6 +7,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "4444:4444"
-    environment:
-      - VITE_API_URL=http://localhost:5555
     restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4444"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    mem_limit: 512m
+    mem_reservation: 256m
