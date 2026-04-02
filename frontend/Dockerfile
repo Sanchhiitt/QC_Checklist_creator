@@ -32,7 +32,7 @@ RUN ls -la /usr/share/nginx/html/ && \
     test -f /usr/share/nginx/html/index.html || exit 1
 
 # Expose port
-EXPOSE 4444
+EXPOSE 5020
 
 # Test nginx config before starting
 RUN nginx -t
