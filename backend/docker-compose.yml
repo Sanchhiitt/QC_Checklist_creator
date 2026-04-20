@@ -1,11 +1,11 @@
-version: '3.8'
-
+name: qc-checklist-backend
 services:
   backend:
     build:
       context: .
       dockerfile: Dockerfile
     image: qc-checklist-backend
+    container_name: qc-checklist-backend
     ports:
       - "6000:6000"
     env_file:

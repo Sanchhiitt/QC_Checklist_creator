@@ -1,11 +1,11 @@
-version: '3.8'
-
+name: qc-checklist-frontend
 services:
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
     image: qc-checklist-frontend
+    container_name: qc-checklist-frontend
     ports:
       - "5020:5020"
     restart: always
