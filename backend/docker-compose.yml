@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: qc-checklist-backend
     ports:
       - "6000:6000"
     env_file:

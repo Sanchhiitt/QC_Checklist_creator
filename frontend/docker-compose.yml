@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: qc-checklist-frontend
     ports:
       - "5020:5020"
     restart: always
