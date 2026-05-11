@@ -6,6 +6,11 @@ services:
       dockerfile: Dockerfile
     image: qc-checklist-frontend
     container_name: qc-checklist-frontend
+    # Pass frontend/.env as runtime env vars. The entrypoint script reads
+    # $VITE_API_URL and bakes it into /config.js before nginx starts —
+    # so changing .env + `docker compose up -d` updates the URL without rebuild.
+    env_file:
+      - .env
     ports:
       - "5020:5020"
     restart: always

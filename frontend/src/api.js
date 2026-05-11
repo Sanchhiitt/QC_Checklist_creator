@@ -1,7 +1,16 @@
 import axios from 'axios';
 
-// Read API base URL from Vite env (VITE_API_URL in frontend/.env), fall back to local backend.
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+// Resolution order:
+//   1. window.RUNTIME_CONFIG.VITE_API_URL  — injected by Docker entrypoint from .env at container start
+//   2. import.meta.env.VITE_API_URL        — Vite reads frontend/.env at build/dev time
+// No hardcoded URL. If neither is set, configure VITE_API_URL in frontend/.env.
+const runtimeConfig = (typeof window !== 'undefined' && window.RUNTIME_CONFIG) || {};
+const API_URL = runtimeConfig.VITE_API_URL || import.meta.env.VITE_API_URL;
+
+if (!API_URL) {
+    // eslint-disable-next-line no-console
+    console.error('[api] VITE_API_URL is not set. Add it to frontend/.env.');
+}
 
 export const generateChecks = async (rawText) => {
     const response = await axios.post(`${API_URL}/generate-checks`, {
