@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { regeneratePrompt } from '../api';
+import { regeneratePrompt, updateCheck } from '../api';
 import * as XLSX from 'xlsx';
 
 const CATEGORIES = [
@@ -16,7 +16,7 @@ const CATEGORIES = [
     'Equipment Elevation'
 ];
 
-const ChecksTable = ({ checks, onUpdateCheck }) => {
+const ChecksTable = ({ checks, onUpdateCheck, sessionId }) => {
     const [editingIndex, setEditingIndex] = useState(null);
     const [editValues, setEditValues] = useState({});
     const [regeneratingIndex, setRegeneratingIndex] = useState(null);
@@ -24,6 +24,9 @@ const ChecksTable = ({ checks, onUpdateCheck }) => {
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [selectedIndices, setSelectedIndices] = useState([]);
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+    const [editingPromptIndex, setEditingPromptIndex] = useState(null);
+    const [editPromptValue, setEditPromptValue] = useState('');
+    const [isSavingPrompt, setIsSavingPrompt] = useState(false);
     const dropdownRef = useRef(null);
 
     useEffect(() => {
@@ -54,13 +57,51 @@ const ChecksTable = ({ checks, onUpdateCheck }) => {
         });
     };
 
-    const handleSaveEdit = (index) => {
+    const handleSaveEdit = async (index) => {
+        const newName = editValues.check_name;
+        const newCategory = editValues.categories.join(', ');
         onUpdateCheck(index, {
             ...checks[index],
-            check_name: editValues.check_name,
-            category: editValues.categories.join(', ')
+            check_name: newName,
+            category: newCategory,
         });
         setEditingIndex(null);
+        try {
+            await updateCheck(sessionId, index, { check_name: newName, category: newCategory }, false);
+        } catch (e) {
+            console.error('Failed to persist check edit:', e);
+        }
+    };
+
+    const handleStartPromptEdit = (index) => {
+        setEditingPromptIndex(index);
+        setEditPromptValue(checks[index].qc_prompt || '');
+    };
+
+    const handleSavePromptEdit = async (index) => {
+        const newPrompt = editPromptValue.trim();
+        if (!newPrompt) return;
+        if (newPrompt === checks[index].qc_prompt) {
+            setEditingPromptIndex(null);
+            return;
+        }
+        setIsSavingPrompt(true);
+        const prev = checks[index];
+        onUpdateCheck(index, {
+            ...prev,
+            qc_prompt: newPrompt,
+            is_manually_edited: true,
+            manual_edit_count: (prev.manual_edit_count || 0) + 1,
+        });
+        try {
+            await updateCheck(sessionId, index, { qc_prompt: newPrompt }, true);
+        } catch (e) {
+            console.error('Failed to persist manual prompt edit:', e);
+        } finally {
+            setIsSavingPrompt(false);
+            setEditingPromptIndex(null);
+            setEditPromptValue('');
+        }
     };
 
     const toggleCategory = (cat) => {
@@ -78,10 +119,13 @@ const ChecksTable = ({ checks, onUpdateCheck }) => {
         if (!userInstruction.trim()) return;
         setIsRegenerating(true);
         try {
-            const newPrompt = await regeneratePrompt(currentPrompt, userInstruction);
+            const newPrompt = await regeneratePrompt(currentPrompt, userInstruction, sessionId, index);
+            const prev = checks[index];
             onUpdateCheck(index, {
-                ...checks[index],
-                qc_prompt: newPrompt
+                ...prev,
+                qc_prompt: newPrompt,
+                is_regenerated: true,
+                regeneration_count: (prev.regeneration_count || 0) + 1,
             });
             setRegeneratingIndex(null);
             setUserInstruction('');
@@ -233,7 +277,25 @@ const ChecksTable = ({ checks, onUpdateCheck }) => {
                                     ) : (
                                         <div className={`space-y-3 transition-opacity ${selectedIndices.includes(index) ? 'opacity-100' : 'opacity-50'}`}>
                                             <div className="flex items-start justify-between">
-                                                <span className="text-sm font-semibold text-slate-900 leading-tight">{check.check_name}</span>
+                                                <div className="flex items-start gap-2 flex-1 flex-wrap">
+                                                    <span className="text-sm font-semibold text-slate-900 leading-tight">{check.check_name}</span>
+                                                    {check.is_regenerated && (
+                                                        <span
+                                                            title={`Regenerated ${check.regeneration_count || 1}x`}
+                                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wider whitespace-nowrap"
+                                                        >
+                                                            ↻ Regenerated{(check.regeneration_count || 0) > 1 ? ` ×${check.regeneration_count}` : ''}
+                                                        </span>
+                                                    )}
+                                                    {check.is_manually_edited && (
+                                                        <span
+                                                            title={`Manually edited ${check.manual_edit_count || 1}x`}
+                                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-violet-50 text-violet-700 border border-violet-200 uppercase tracking-wider whitespace-nowrap"
+                                                        >
+                                                            ✎ Edited{(check.manual_edit_count || 0) > 1 ? ` ×${check.manual_edit_count}` : ''}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <button
                                                     className="ml-2 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all border border-transparent hover:border-blue-100"
                                                     onClick={() => handleEdit(index, check)}
@@ -256,11 +318,40 @@ const ChecksTable = ({ checks, onUpdateCheck }) => {
                                 </td>
                                 <td className="px-6 py-6 align-top">
                                     <div className={`bg-slate-50 rounded-xl p-4 border border-slate-100 transition-opacity ${selectedIndices.includes(index) ? 'opacity-100' : 'opacity-50'}`}>
-                                        <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
-                                            {check.qc_prompt}
-                                        </p>
-                                        <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
-                                            {regeneratingIndex === index ? (
+                                        {editingPromptIndex === index ? (
+                                            <textarea
+                                                className="w-full text-sm p-3 rounded-lg border border-violet-300 focus:ring-2 focus:ring-violet-500 outline-none min-h-[160px] bg-white text-slate-700 leading-relaxed whitespace-pre-wrap font-medium"
+                                                value={editPromptValue}
+                                                onChange={(e) => setEditPromptValue(e.target.value)}
+                                                disabled={isSavingPrompt}
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
+                                                {check.qc_prompt}
+                                            </p>
+                                        )}
+                                        <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center gap-2 flex-wrap">
+                                            {editingPromptIndex === index ? (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        className="bg-violet-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-violet-700 flex items-center gap-2 disabled:opacity-60"
+                                                        onClick={() => handleSavePromptEdit(index)}
+                                                        disabled={isSavingPrompt || !editPromptValue.trim()}
+                                                    >
+                                                        {isSavingPrompt ? (
+                                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                        ) : '💾 Save Prompt'}
+                                                    </button>
+                                                    <button
+                                                        className="text-slate-500 text-xs font-bold hover:text-slate-700"
+                                                        onClick={() => { setEditingPromptIndex(null); setEditPromptValue(''); }}
+                                                        disabled={isSavingPrompt}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            ) : regeneratingIndex === index ? (
                                                 <div className="w-full space-y-3">
                                                     <textarea
                                                         placeholder="Tell AI what to fix..."
@@ -288,15 +379,27 @@ const ChecksTable = ({ checks, onUpdateCheck }) => {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <button
-                                                    className="flex items-center gap-2 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-white border border-blue-100 px-3 py-2 rounded-lg shadow-sm hover:shadow transition-all"
-                                                    onClick={() => setRegeneratingIndex(index)}
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                                                    </svg>
-                                                    Refine with AI
-                                                </button>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <button
+                                                        className="flex items-center gap-2 text-[11px] font-bold text-violet-700 hover:text-violet-900 bg-white border border-violet-100 px-3 py-2 rounded-lg shadow-sm hover:shadow transition-all"
+                                                        onClick={() => handleStartPromptEdit(index)}
+                                                        title="Manually edit this prompt"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                                        </svg>
+                                                        Edit Prompt
+                                                    </button>
+                                                    <button
+                                                        className="flex items-center gap-2 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-white border border-blue-100 px-3 py-2 rounded-lg shadow-sm hover:shadow transition-all"
+                                                        onClick={() => setRegeneratingIndex(index)}
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                                                        </svg>
+                                                        Refine with AI
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>

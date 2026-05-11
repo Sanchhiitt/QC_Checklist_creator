@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import CheckGenerator from './components/CheckGenerator';
 import ChecksTable from './components/ChecksTable';
+import Dashboard from './components/Dashboard';
 import { generateChecks } from './api';
 
 function App() {
     const [checks, setChecks] = useState([]);
+    const [sessionId, setSessionId] = useState(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState(null);
+    const [view, setView] = useState('generator'); // 'generator' | 'dashboard'
 
     const handleUpdateCheck = (index, updatedCheck) => {
         const newChecks = [...checks];
@@ -18,9 +21,17 @@ function App() {
         setIsGenerating(true);
         setMessage(null);
         try {
-            const generatedChecks = await generateChecks(rawText);
-            setChecks(generatedChecks);
-            // Smooth scroll to results
+            const data = await generateChecks(rawText);
+            // Backwards-compatible: if server returns an array, treat it as plain checks
+            const generated = Array.isArray(data) ? data : (data.checks || []);
+            const sid = Array.isArray(data) ? null : (data.session_id || null);
+            const enriched = generated.map((c) => ({
+                ...c,
+                is_regenerated: false,
+                regeneration_count: 0,
+            }));
+            setChecks(enriched);
+            setSessionId(sid);
             setTimeout(() => {
                 window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             }, 100);
@@ -41,34 +52,57 @@ function App() {
                         <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">Q</div>
                         <h1 className="text-xl font-bold text-slate-900 tracking-tight">QC Genius <span className="text-blue-600 font-medium">Pro</span></h1>
                     </div>
-                    <div className="hidden md:flex gap-6 text-sm font-medium text-slate-500">
-                        <span className="text-blue-600 italic">v2.0 Beta</span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setView('generator')}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${view === 'generator' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                        >
+                            Generator
+                        </button>
+                        <button
+                            onClick={() => setView('dashboard')}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                        >
+                            Dashboard
+                        </button>
+                        <span className="hidden md:inline text-xs font-medium text-blue-600 italic ml-2">v2.1</span>
                     </div>
                 </div>
             </nav>
 
             <div className="container px-4">
-                {/* Main Content Area */}
-                <div className="grid grid-cols-1 gap-8">
-
-                    <div className="glass-card bg-white border border-slate-200 rounded-2xl p-8 shadow-xl shadow-slate-200/50">
-                        <CheckGenerator onGenerate={handleGenerate} isLoading={isGenerating} />
-                    </div>
-
-                    {message && (
-                        <div className={`p-4 rounded-xl border flex items-center gap-3 animate-in fade-in duration-300 ${message.type === 'error'
-                                ? 'bg-red-50 border-red-100 text-red-700'
-                                : 'bg-emerald-50 border-emerald-100 text-emerald-700'
-                            }`}>
-                            {message.type === 'error' ? '⚠️' : '✅'}
-                            <span className="text-sm font-medium">{message.text}</span>
+                {view === 'generator' ? (
+                    <div className="grid grid-cols-1 gap-8">
+                        <div className="glass-card bg-white border border-slate-200 rounded-2xl p-8 shadow-xl shadow-slate-200/50">
+                            <CheckGenerator onGenerate={handleGenerate} isLoading={isGenerating} />
+                            {sessionId && (
+                                <p className="mt-4 text-[11px] text-slate-400">
+                                    Session: <span className="font-mono text-slate-600">{sessionId}</span>
+                                </p>
+                            )}
                         </div>
-                    )}
 
-                    <div id="results-area">
-                        <ChecksTable checks={checks} onUpdateCheck={handleUpdateCheck} />
+                        {message && (
+                            <div className={`p-4 rounded-xl border flex items-center gap-3 animate-in fade-in duration-300 ${message.type === 'error'
+                                    ? 'bg-red-50 border-red-100 text-red-700'
+                                    : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                                }`}>
+                                {message.type === 'error' ? '⚠️' : '✅'}
+                                <span className="text-sm font-medium">{message.text}</span>
+                            </div>
+                        )}
+
+                        <div id="results-area">
+                            <ChecksTable
+                                checks={checks}
+                                onUpdateCheck={handleUpdateCheck}
+                                sessionId={sessionId}
+                            />
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    <Dashboard />
+                )}
             </div>
 
             <footer className="mt-20 py-8 border-t border-slate-200 text-center text-slate-400 text-xs">
