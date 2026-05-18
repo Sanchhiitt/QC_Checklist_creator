@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from models import JurisdictionRequest, QCRequest, QCCheck, RegenerateRequest, UpdateCheckRequest
 from services import gemini_service, db_service
+from proxy_routes import router as qc_analytics_proxy_router
 
 load_dotenv()
 
@@ -16,6 +17,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(qc_analytics_proxy_router)
 
 @app.get("/")
 def read_root():

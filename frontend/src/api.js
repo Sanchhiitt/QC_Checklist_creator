@@ -56,3 +56,44 @@ export const fetchSession = async (sessionId) => {
     const response = await axios.get(`${API_URL}/sessions/${sessionId}`);
     return response.data;
 };
+
+// ─── QC Analytics (proxied through this backend to solar_ai_agents) ────────
+// All endpoints accept optional ISO-8601 `from` / `to`; backend defaults to
+// the rolling last 30 days when omitted.
+
+export const fetchQCAnalyticsOverview = async ({ from, to } = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/overview`, {
+        params: { from, to },
+    });
+    return response.data;
+};
+
+export const fetchQCAnalyticsByAHJ = async ({ from, to } = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/by-ahj`, {
+        params: { from, to },
+    });
+    return response.data;
+};
+
+export const fetchQCAnalyticsByUtility = async ({ from, to } = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/by-utility`, {
+        params: { from, to },
+    });
+    return response.data;
+};
+
+export const fetchQCAnalyticsByState = async ({ from, to } = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/by-state`, {
+        params: { from, to },
+    });
+    return response.data;
+};
+
+export const fetchQCTopFailingChecks = async ({
+    from, to, ahj, utility, state, limit = 10,
+} = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/top-failing-checks`, {
+        params: { from, to, ahj, utility, state, limit },
+    });
+    return response.data;
+};
