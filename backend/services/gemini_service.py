@@ -36,7 +36,9 @@ def generate_checks(raw_text: str, state: str = None, jurisdiction_type: str = N
     if not api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
-    genai.configure(api_key=api_key)
+    # transport="rest" forces plain HTTPS instead of gRPC — required when the host
+    # network blocks gRPC (common in Docker on restricted networks / corp VPNs).
+    genai.configure(api_key=api_key, transport="rest")
     model = genai.GenerativeModel('gemini-2.0-flash')
 
     prompt = GEMINI_PROMPT_TEMPLATE.format(
@@ -64,7 +66,7 @@ def regenerate_prompt(current_prompt: str, user_instruction: str) -> str:
     if not api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
-    genai.configure(api_key=api_key)
+    genai.configure(api_key=api_key, transport="rest")
     model = genai.GenerativeModel('gemini-2.0-flash')
 
     prompt = f"""
