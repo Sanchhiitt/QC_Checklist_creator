@@ -32,7 +32,7 @@ const StatusBadge = ({ status }) => {
     );
 };
 
-// ─── Small UI primitives (match Dashboard.jsx) ────────────────────────────
+// ─── Small UI primitives ──────────────────────────────────────────────────
 const StatCard = ({ label, value, hint, accent = 'blue' }) => {
     const accents = {
         blue: 'text-blue-600 bg-blue-50 border-blue-100',
@@ -55,7 +55,7 @@ const PassRateBar = ({ rate }) => {
     const pct = Math.max(0, Math.min(100, Number(rate) || 0));
     const color = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-500' : 'bg-rose-500';
     return (
-        <div className="flex items-center gap-2 min-w-[100px]">
+        <div className="flex items-center gap-2 min-w-[90px]">
             <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                 <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
             </div>
@@ -66,83 +66,80 @@ const PassRateBar = ({ rate }) => {
 
 const formatDate = (iso) => {
     if (!iso) return '—';
-    try {
-        return new Date(iso).toLocaleString();
-    } catch {
-        return iso;
-    }
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
 };
 
-// ─── Run history (shown when a check row is expanded) ─────────────────────
-const RunHistory = ({ runs }) => {
+// Tiny pass/fail/warn count chips
+const CountChips = ({ counts }) => (
+    <div className="flex gap-1">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">{counts?.pass ?? 0}P</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-bold">{counts?.fail ?? 0}F</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">{counts?.warning ?? 0}W</span>
+    </div>
+);
+
+// ─── Run history — AI vs Human comparison table ───────────────────────────
+const RunComparison = ({ runs }) => {
     if (!runs || runs.length === 0) {
         return <div className="px-6 py-4 text-xs text-slate-400">No run history.</div>;
     }
     return (
         <div className="bg-slate-50/70 px-6 py-4">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Run history — {runs.length} run{runs.length > 1 ? 's' : ''}
+                Run history — {runs.length} run{runs.length > 1 ? 's' : ''} · AI vs Human
             </div>
             <div className="space-y-2">
                 {runs.map((run, idx) => {
-                    const fb = run.feedback || [];
-                    const reasons = run.reasons || [];
+                    const human = run.human || {};
+                    const ai = run.ai || {};
                     return (
-                        <div key={run.run_id || idx} className="bg-white border border-slate-200 rounded-lg p-3">
-                            <div className="flex items-center justify-between gap-3 flex-wrap">
-                                <div className="flex items-center gap-3 flex-wrap">
-                                    <StatusBadge status={run.effective_status} />
-                                    {run.has_feedback && (
-                                        <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded">
-                                            ✎ human-reviewed
-                                        </span>
-                                    )}
-                                    <span className="text-[11px] text-slate-500">{formatDate(run.date)}</span>
-                                </div>
-                                <span className="text-[11px] text-slate-400">
-                                    project {run.project_id ?? '—'}
+                        <div key={run.run_id || idx} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                            {/* Run meta */}
+                            <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                                <span className="text-[11px] text-slate-600 font-semibold">{formatDate(run.date)}</span>
+                                <span className="text-[11px] text-slate-500">
+                                    File: {(run.files && run.files.length > 0) ? run.files.join(', ') : '—'}
                                 </span>
+                                <span className="text-[11px] text-slate-400">project {run.project_id ?? '—'}</span>
                             </div>
-
-                            {/* File(s) the check ran for */}
-                            <div className="mt-1.5 text-[11px] text-slate-600">
-                                <span className="font-bold text-slate-500">File: </span>
-                                {(run.files && run.files.length > 0) ? run.files.join(', ') : '—'}
-                            </div>
-
-                            {/* LLM original verdict if feedback overrode it */}
-                            {run.has_feedback && run.llm_status &&
-                                classifyStatus(run.llm_status) !== classifyStatus(run.effective_status) && (
-                                <div className="mt-1 text-[11px] text-slate-400">
-                                    AI originally marked it <span className="font-semibold">{run.llm_status}</span>,
-                                    overridden by reviewer.
+                            {/* AI vs Human two columns */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                                {/* AI */}
+                                <div className="p-3">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">AI Response</span>
+                                        <StatusBadge status={ai.status} />
+                                    </div>
+                                    {(ai.reasons && ai.reasons.length > 0) ? (
+                                        <ul className="list-disc list-inside text-[11px] text-slate-600 space-y-0.5">
+                                            {ai.reasons.slice(0, 5).map((r, ri) => <li key={ri}>{r}</li>)}
+                                        </ul>
+                                    ) : (
+                                        <div className="text-[11px] text-slate-400">No reason provided.</div>
+                                    )}
                                 </div>
-                            )}
-
-                            {/* Human feedback */}
-                            {fb.length > 0 && (
-                                <div className="mt-2 space-y-1">
-                                    {fb.map((f, fi) => (
-                                        <div key={fi} className="text-[11px] bg-violet-50/60 border border-violet-100 rounded px-2 py-1">
-                                            <span className="font-bold text-violet-700 uppercase">{f.status}</span>
-                                            {f.remarks ? <span className="text-slate-700"> — {f.remarks}</span> : null}
-                                            {f.timestamp && (
-                                                <span className="text-slate-400"> ({formatDate(f.timestamp)})</span>
-                                            )}
+                                {/* Human */}
+                                <div className={`p-3 ${human.reviewed ? 'bg-violet-50/30' : ''}`}>
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700">Human Review</span>
+                                        {human.reviewed
+                                            ? <StatusBadge status={human.status} />
+                                            : <span className="text-[10px] text-slate-400 italic">not reviewed</span>}
+                                    </div>
+                                    {human.reviewed ? (
+                                        <div className="space-y-1">
+                                            {(human.feedback || []).map((f, fi) => (
+                                                <div key={fi} className="text-[11px] text-slate-700">
+                                                    <span className="font-bold text-violet-700 uppercase">{f.status}</span>
+                                                    {f.remarks ? <span> — {f.remarks}</span> : null}
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    ) : (
+                                        <div className="text-[11px] text-slate-400">No human feedback yet.</div>
+                                    )}
                                 </div>
-                            )}
-
-                            {/* LLM reasons (the AI's own explanation) */}
-                            {reasons.length > 0 && (
-                                <div className="mt-2">
-                                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-0.5">AI reason</div>
-                                    <ul className="list-disc list-inside text-[11px] text-slate-600 space-y-0.5">
-                                        {reasons.slice(0, 4).map((r, ri) => <li key={ri}>{r}</li>)}
-                                    </ul>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     );
                 })}
@@ -158,6 +155,8 @@ const SectionBlock = ({ title, geoLabel, data, accent }) => {
 
     const summary = data?.summary || {};
     const checks = data?.checks || [];
+    const ai = summary.ai || {};
+    const human = summary.human || {};
 
     return (
         <div className="space-y-4">
@@ -166,16 +165,26 @@ const SectionBlock = ({ title, geoLabel, data, accent }) => {
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <StatCard label="Checks" value={summary.distinct_checks ?? 0} accent={accent} />
-                <StatCard label="Total Runs" value={summary.total_checks ?? 0} accent="slate" />
-                <StatCard label="Pass" value={summary.pass ?? 0} accent="emerald" />
-                <StatCard label="Fail" value={summary.fail ?? 0} accent="rose" />
-                <StatCard label="Warning" value={summary.warning ?? 0} accent="amber" />
+                <StatCard label="Total Runs" value={summary.total_runs ?? 0} accent="slate" />
                 <StatCard
-                    label="Pass Rate"
-                    value={`${summary.pass_rate ?? 0}%`}
-                    hint={`${summary.feedback_count ?? 0} reviewed`}
+                    label="AI Pass Rate"
+                    value={`${summary.ai_pass_rate ?? 0}%`}
+                    hint={`${ai.pass ?? 0}P / ${ai.fail ?? 0}F / ${ai.warning ?? 0}W`}
                     accent="blue"
                 />
+                <StatCard
+                    label="Human Reviewed"
+                    value={summary.reviewed_count ?? 0}
+                    hint="runs with feedback"
+                    accent="violet"
+                />
+                <StatCard
+                    label="Human Pass Rate"
+                    value={`${summary.human_pass_rate ?? 0}%`}
+                    hint={`${human.pass ?? 0}P / ${human.fail ?? 0}F / ${human.warning ?? 0}W`}
+                    accent="emerald"
+                />
+                <StatCard label="AI Fails" value={ai.fail ?? 0} accent="rose" />
             </div>
 
             {/* Check table */}
@@ -193,10 +202,9 @@ const SectionBlock = ({ title, geoLabel, data, accent }) => {
                                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Check</th>
                                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{geoLabel}</th>
                                     <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Runs</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pass</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fail</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Warn</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pass rate</th>
+                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-blue-600 uppercase tracking-wider">AI (P/F/W)</th>
+                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-violet-700 uppercase tracking-wider">Human (P/F/W)</th>
+                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Reviewed</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -205,10 +213,7 @@ const SectionBlock = ({ title, geoLabel, data, accent }) => {
                                     const open = !!expanded[key];
                                     return (
                                         <React.Fragment key={key}>
-                                            <tr
-                                                className="hover:bg-slate-50 cursor-pointer"
-                                                onClick={() => toggle(key)}
-                                            >
+                                            <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => toggle(key)}>
                                                 <td className="px-4 py-3 text-slate-400 text-xs">{open ? '▼' : '▶'}</td>
                                                 <td className="px-4 py-3 text-xs">
                                                     <div className="font-semibold text-slate-800">{c.check_name}</div>
@@ -216,15 +221,18 @@ const SectionBlock = ({ title, geoLabel, data, accent }) => {
                                                 </td>
                                                 <td className="px-4 py-3 text-xs text-slate-600">{c.geo}</td>
                                                 <td className="px-4 py-3 text-xs text-right text-slate-700 font-semibold">{c.total_runs}</td>
-                                                <td className="px-4 py-3 text-xs text-right text-emerald-700 font-semibold">{c.pass}</td>
-                                                <td className="px-4 py-3 text-xs text-right text-rose-700 font-semibold">{c.fail}</td>
-                                                <td className="px-4 py-3 text-xs text-right text-amber-700 font-semibold">{c.warning}</td>
-                                                <td className="px-4 py-3 text-right"><PassRateBar rate={c.pass_rate} /></td>
+                                                <td className="px-4 py-3"><CountChips counts={c.ai} /></td>
+                                                <td className="px-4 py-3">
+                                                    {c.reviewed_count > 0
+                                                        ? <CountChips counts={c.human} />
+                                                        : <span className="text-[11px] text-slate-400 italic">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-xs text-right text-violet-700 font-semibold">{c.reviewed_count}</td>
                                             </tr>
                                             {open && (
                                                 <tr>
-                                                    <td colSpan={8} className="p-0">
-                                                        <RunHistory runs={c.runs} />
+                                                    <td colSpan={7} className="p-0">
+                                                        <RunComparison runs={c.runs} />
                                                     </td>
                                                 </tr>
                                             )}
@@ -245,7 +253,7 @@ const TrendTable = ({ title, rows }) => (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">{title}</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Ranked by failures — highest first</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Ranked by AI failures — highest first</p>
         </div>
         {(!rows || rows.length === 0) ? (
             <div className="p-8 text-center text-sm text-slate-400">No data.</div>
@@ -255,10 +263,9 @@ const TrendTable = ({ title, rows }) => (
                     <tr>
                         <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">State</th>
                         <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Checks</th>
-                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pass</th>
-                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fail</th>
-                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Warn</th>
-                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pass rate</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-bold text-blue-600 uppercase tracking-wider">AI (P/F/W)</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-bold text-violet-700 uppercase tracking-wider">Human (P/F/W)</th>
+                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">AI Pass rate</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -266,10 +273,13 @@ const TrendTable = ({ title, rows }) => (
                         <tr key={r.state || idx} className={`hover:bg-slate-50 ${idx === 0 ? 'bg-rose-50/40' : ''}`}>
                             <td className="px-4 py-3 text-xs font-semibold text-slate-800">{r.state}</td>
                             <td className="px-4 py-3 text-xs text-right text-slate-700">{r.total_checks}</td>
-                            <td className="px-4 py-3 text-xs text-right text-emerald-700 font-semibold">{r.pass}</td>
-                            <td className="px-4 py-3 text-xs text-right text-rose-700 font-semibold">{r.fail}</td>
-                            <td className="px-4 py-3 text-xs text-right text-amber-700 font-semibold">{r.warning}</td>
-                            <td className="px-4 py-3 text-right"><PassRateBar rate={r.pass_rate} /></td>
+                            <td className="px-4 py-3"><CountChips counts={r.ai} /></td>
+                            <td className="px-4 py-3">
+                                {r.reviewed_count > 0
+                                    ? <CountChips counts={r.human} />
+                                    : <span className="text-[11px] text-slate-400 italic">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-right"><PassRateBar rate={r.ai_pass_rate} /></td>
                         </tr>
                     ))}
                 </tbody>
@@ -294,7 +304,7 @@ const QCAnalytics = () => {
 
     const [range, setRange] = useState(defaultRange);
     const [states, setStates] = useState([]);
-    const [selectedState, setSelectedState] = useState('');   // '' = All states
+    const [selectedState, setSelectedState] = useState('');
     const [ahjData, setAhjData] = useState(null);
     const [utilData, setUtilData] = useState(null);
     const [ahjTrend, setAhjTrend] = useState([]);
@@ -302,7 +312,6 @@ const QCAnalytics = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Load the section + trend data for the current filters.
     const loadData = async (state, r) => {
         setLoading(true);
         setError(null);
@@ -329,7 +338,6 @@ const QCAnalytics = () => {
         }
     };
 
-    // On mount — load the state list, pick the first state, then load data.
     useEffect(() => {
         (async () => {
             try {
@@ -362,7 +370,7 @@ const QCAnalytics = () => {
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800">QC Analytics</h2>
                     <p className="text-xs text-slate-500 mt-1">
-                        AHJ &amp; Utility check performance. Pick a state to keep clusters clean.
+                        AHJ &amp; Utility checks — AI verdict vs human review, side by side.
                     </p>
                 </div>
                 <div className="flex items-end gap-2 flex-wrap">
@@ -425,28 +433,14 @@ const QCAnalytics = () => {
 
             {!loading && !error && (
                 <>
-                    {/* AHJ section */}
-                    <SectionBlock
-                        title="AHJ Checks"
-                        geoLabel="AHJ"
-                        data={ahjData}
-                        accent="violet"
-                    />
+                    <SectionBlock title="AHJ Checks" geoLabel="AHJ" data={ahjData} accent="violet" />
+                    <SectionBlock title="Utility Checks" geoLabel="Utility" data={utilData} accent="amber" />
 
-                    {/* Utility section */}
-                    <SectionBlock
-                        title="Utility Checks"
-                        geoLabel="Utility"
-                        data={utilData}
-                        accent="amber"
-                    />
-
-                    {/* State trend */}
                     <div className="space-y-4">
                         <div>
                             <h3 className="text-lg font-bold text-slate-800">State Trend</h3>
                             <p className="text-xs text-slate-500 mt-1">
-                                Which states&apos; checks fail / pass the most (across all states, ignores the state filter above).
+                                Which states&apos; checks fail / pass the most (all states, ignores the state filter above).
                             </p>
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
