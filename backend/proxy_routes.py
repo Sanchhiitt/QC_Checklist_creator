@@ -81,3 +81,13 @@ async def state_trend(
     return await _forward("/api/v1/qc/analytics/state-trend", {
         "dimension": dimension, "from": date_from, "to": date_to,
     })
+
+
+@router.get("/general/section")
+async def general_section(
+    date_from: Optional[str] = Query(None, alias="from"),
+    date_to: Optional[str] = Query(None, alias="to"),
+):
+    return await _forward("/api/v1/qc/analytics/general/section", {
+        "from": date_from, "to": date_to,
+    })

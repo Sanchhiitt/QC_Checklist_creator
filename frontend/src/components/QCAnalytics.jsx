@@ -78,6 +78,39 @@ const CountChips = ({ counts }) => (
     </div>
 );
 
+// Status filter — keep a check only if the HUMAN recorded that status at
+// least once. AI counts are ignored here. Checks never human-reviewed are
+// hidden for pass/fail/warning (shown only under "All").
+const matchesStatusFilter = (check, filter) => {
+    if (filter === 'all') return true;
+    const human = check.human || {};
+    return (human[filter] || 0) > 0;
+};
+
+const StatusFilter = ({ value, onChange }) => {
+    const opts = [
+        { id: 'all', label: 'All' },
+        { id: 'pass', label: 'Pass' },
+        { id: 'fail', label: 'Fail' },
+        { id: 'warning', label: 'Warning' },
+    ];
+    return (
+        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+            {opts.map((o) => (
+                <button
+                    key={o.id}
+                    onClick={() => onChange(o.id)}
+                    className={`text-xs font-bold px-3 py-1 rounded-md transition-all ${
+                        value === o.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                >
+                    {o.label}
+                </button>
+            ))}
+        </div>
+    );
+};
+
 // ─── Run history — AI vs Human comparison table ───────────────────────────
 const RunComparison = ({ runs }) => {
     if (!runs || runs.length === 0) {
@@ -149,12 +182,13 @@ const RunComparison = ({ runs }) => {
 };
 
 // ─── A section: AHJ or Utility ────────────────────────────────────────────
-const SectionBlock = ({ title, geoLabel, data, accent }) => {
+const SectionBlock = ({ title, geoLabel, data, accent, statusFilter }) => {
     const [expanded, setExpanded] = useState({});
     const toggle = (key) => setExpanded((e) => ({ ...e, [key]: !e[key] }));
 
     const summary = data?.summary || {};
-    const checks = data?.checks || [];
+    const allChecks = data?.checks || [];
+    const checks = allChecks.filter((c) => matchesStatusFilter(c, statusFilter));
     const ai = summary.ai || {};
     const human = summary.human || {};
 
@@ -311,6 +345,7 @@ const QCAnalytics = () => {
     const [utilTrend, setUtilTrend] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [statusFilter, setStatusFilter] = useState('all');
 
     const loadData = async (state, r) => {
         setLoading(true);
@@ -412,6 +447,14 @@ const QCAnalytics = () => {
                 </div>
             </div>
 
+            {/* Status filter — instant, client-side */}
+            {!loading && !error && (
+                <div className="flex items-center gap-2 px-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Show checks with:</span>
+                    <StatusFilter value={statusFilter} onChange={setStatusFilter} />
+                </div>
+            )}
+
             {loading && (
                 <div className="flex items-center justify-center py-20">
                     <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-600 rounded-full animate-spin"></div>
@@ -433,8 +476,8 @@ const QCAnalytics = () => {
 
             {!loading && !error && (
                 <>
-                    <SectionBlock title="AHJ Checks" geoLabel="AHJ" data={ahjData} accent="violet" />
-                    <SectionBlock title="Utility Checks" geoLabel="Utility" data={utilData} accent="amber" />
+                    <SectionBlock title="AHJ Checks" geoLabel="AHJ" data={ahjData} accent="violet" statusFilter={statusFilter} />
+                    <SectionBlock title="Utility Checks" geoLabel="Utility" data={utilData} accent="amber" statusFilter={statusFilter} />
 
                     <div className="space-y-4">
                         <div>

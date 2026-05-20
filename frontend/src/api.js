@@ -86,3 +86,12 @@ export const fetchQCStateTrend = async ({ dimension, from, to } = {}) => {
     });
     return response.data; // { dimension, rows: [...] }
 };
+
+// Per-check AI-vs-Human comparison for GENERAL checks (no state scope).
+// Checks come back sorted most-failing first.
+export const fetchQCGeneralSection = async ({ from, to } = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/general/section`, {
+        params: { from, to },
+    });
+    return response.data; // { dimension: 'general', summary, checks: [...] }
+};
