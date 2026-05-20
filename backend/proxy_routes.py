@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/qc-analytics", tags=["QC Analytics Proxy"])
 
 SOLAR_AGENTS_BASE = os.getenv("SOLAR_AGENTS_API_BASE", "").rstrip("/")
 SOLAR_AGENTS_TOKEN = os.getenv("SOLAR_AGENTS_SERVICE_TOKEN", "")
-HTTP_TIMEOUT = float(os.getenv("SOLAR_AGENTS_TIMEOUT_SECS", "30"))
+HTTP_TIMEOUT = float(os.getenv("SOLAR_AGENTS_TIMEOUT_SECS", "45"))
 
 
 async def _forward(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
@@ -52,48 +52,32 @@ async def _forward(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
     return r.json()
 
 
-@router.get("/overview")
-async def overview(
+@router.get("/states")
+async def states(
     date_from: Optional[str] = Query(None, alias="from"),
     date_to: Optional[str] = Query(None, alias="to"),
 ):
-    return await _forward("/api/v1/qc/analytics/overview", {"from": date_from, "to": date_to})
+    return await _forward("/api/v1/qc/analytics/states", {"from": date_from, "to": date_to})
 
 
-@router.get("/by-ahj")
-async def by_ahj(
-    date_from: Optional[str] = Query(None, alias="from"),
-    date_to: Optional[str] = Query(None, alias="to"),
-):
-    return await _forward("/api/v1/qc/analytics/by-ahj", {"from": date_from, "to": date_to})
-
-
-@router.get("/by-utility")
-async def by_utility(
-    date_from: Optional[str] = Query(None, alias="from"),
-    date_to: Optional[str] = Query(None, alias="to"),
-):
-    return await _forward("/api/v1/qc/analytics/by-utility", {"from": date_from, "to": date_to})
-
-
-@router.get("/by-state")
-async def by_state(
-    date_from: Optional[str] = Query(None, alias="from"),
-    date_to: Optional[str] = Query(None, alias="to"),
-):
-    return await _forward("/api/v1/qc/analytics/by-state", {"from": date_from, "to": date_to})
-
-
-@router.get("/top-failing-checks")
-async def top_failing_checks(
-    date_from: Optional[str] = Query(None, alias="from"),
-    date_to: Optional[str] = Query(None, alias="to"),
-    ahj: Optional[str] = Query(None),
-    utility: Optional[str] = Query(None),
+@router.get("/section")
+async def section(
+    dimension: str = Query(..., description="'ahj' or 'utility'"),
     state: Optional[str] = Query(None),
-    limit: int = Query(10, ge=1, le=100),
+    date_from: Optional[str] = Query(None, alias="from"),
+    date_to: Optional[str] = Query(None, alias="to"),
 ):
-    return await _forward("/api/v1/qc/analytics/top-failing-checks", {
-        "from": date_from, "to": date_to,
-        "ahj": ahj, "utility": utility, "state": state, "limit": limit,
+    return await _forward("/api/v1/qc/analytics/section", {
+        "dimension": dimension, "state": state, "from": date_from, "to": date_to,
+    })
+
+
+@router.get("/state-trend")
+async def state_trend(
+    dimension: str = Query(..., description="'ahj' or 'utility'"),
+    date_from: Optional[str] = Query(None, alias="from"),
+    date_to: Optional[str] = Query(None, alias="to"),
+):
+    return await _forward("/api/v1/qc/analytics/state-trend", {
+        "dimension": dimension, "from": date_from, "to": date_to,
     })

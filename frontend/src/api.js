@@ -58,42 +58,31 @@ export const fetchSession = async (sessionId) => {
 };
 
 // ─── QC Analytics (proxied through this backend to solar_ai_agents) ────────
+// Scope: AHJ + Utility checks only.
 // All endpoints accept optional ISO-8601 `from` / `to`; backend defaults to
 // the rolling last 30 days when omitted.
 
-export const fetchQCAnalyticsOverview = async ({ from, to } = {}) => {
-    const response = await axios.get(`${API_URL}/qc-analytics/overview`, {
+// Distinct states across QC runs — used to populate the state filter dropdown.
+export const fetchQCStates = async ({ from, to } = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/states`, {
         params: { from, to },
     });
-    return response.data;
+    return response.data; // { window, states: [...] }
 };
 
-export const fetchQCAnalyticsByAHJ = async ({ from, to } = {}) => {
-    const response = await axios.get(`${API_URL}/qc-analytics/by-ahj`, {
-        params: { from, to },
+// Per-check stats + full run history for one dimension ('ahj' | 'utility'),
+// optionally scoped to a single state.
+export const fetchQCSection = async ({ dimension, state, from, to } = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/section`, {
+        params: { dimension, state, from, to },
     });
-    return response.data;
+    return response.data; // { dimension, state, summary, checks: [...] }
 };
 
-export const fetchQCAnalyticsByUtility = async ({ from, to } = {}) => {
-    const response = await axios.get(`${API_URL}/qc-analytics/by-utility`, {
-        params: { from, to },
+// Per-state pass/fail ranking for one dimension ('ahj' | 'utility').
+export const fetchQCStateTrend = async ({ dimension, from, to } = {}) => {
+    const response = await axios.get(`${API_URL}/qc-analytics/state-trend`, {
+        params: { dimension, from, to },
     });
-    return response.data;
-};
-
-export const fetchQCAnalyticsByState = async ({ from, to } = {}) => {
-    const response = await axios.get(`${API_URL}/qc-analytics/by-state`, {
-        params: { from, to },
-    });
-    return response.data;
-};
-
-export const fetchQCTopFailingChecks = async ({
-    from, to, ahj, utility, state, limit = 10,
-} = {}) => {
-    const response = await axios.get(`${API_URL}/qc-analytics/top-failing-checks`, {
-        params: { from, to, ahj, utility, state, limit },
-    });
-    return response.data;
+    return response.data; // { dimension, rows: [...] }
 };
