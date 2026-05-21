@@ -69,6 +69,20 @@ const formatDate = (iso) => {
     try { return new Date(iso).toLocaleString(); } catch { return iso; }
 };
 
+// Per-check accuracy — how often AI agreed with the human reviewer.
+// '—' when no run was human-reviewed (can't be measured).
+const AccuracyCell = ({ accuracy, reviewed }) => {
+    if (accuracy == null || !reviewed) {
+        return <span className="text-slate-300" title="No human review yet">—</span>;
+    }
+    const color = accuracy >= 80 ? 'text-emerald-700' : accuracy >= 50 ? 'text-amber-700' : 'text-rose-700';
+    return (
+        <span className={`font-bold ${color}`} title={`AI matched human on ${reviewed} reviewed run(s)`}>
+            {accuracy}%
+        </span>
+    );
+};
+
 // Tiny pass/fail/warn count chips
 const CountChips = ({ counts }) => (
     <div className="flex gap-1">
@@ -125,13 +139,15 @@ const RunComparison = ({ runs }) => {
                 {runs.map((run, idx) => {
                     const human = run.human || {};
                     const ai = run.ai || {};
+                    const files = Array.isArray(run.files) ? run.files : [];
+                    const reasons = Array.isArray(ai.reasons) ? ai.reasons : [];
                     return (
                         <div key={run.run_id || idx} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                             {/* Run meta */}
                             <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                                 <span className="text-[11px] text-slate-600 font-semibold">{formatDate(run.date)}</span>
                                 <span className="text-[11px] text-slate-500">
-                                    File: {(run.files && run.files.length > 0) ? run.files.join(', ') : '—'}
+                                    File: {files.length > 0 ? files.join(', ') : '—'}
                                 </span>
                                 <span className="text-[11px] text-slate-400">project {run.project_id ?? '—'}</span>
                             </div>
@@ -143,9 +159,11 @@ const RunComparison = ({ runs }) => {
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">AI Response</span>
                                         <StatusBadge status={ai.status} />
                                     </div>
-                                    {(ai.reasons && ai.reasons.length > 0) ? (
+                                    {reasons.length > 0 ? (
                                         <ul className="list-disc list-inside text-[11px] text-slate-600 space-y-0.5">
-                                            {ai.reasons.slice(0, 5).map((r, ri) => <li key={ri}>{r}</li>)}
+                                            {reasons.slice(0, 5).map((r, ri) => (
+                                                <li key={ri}>{typeof r === 'object' ? JSON.stringify(r) : r}</li>
+                                            ))}
                                         </ul>
                                     ) : (
                                         <div className="text-[11px] text-slate-400">No reason provided.</div>
@@ -184,44 +202,25 @@ const RunComparison = ({ runs }) => {
 // ─── A section: AHJ or Utility ────────────────────────────────────────────
 const SectionBlock = ({ title, geoLabel, data, accent, statusFilter }) => {
     const [expanded, setExpanded] = useState({});
+    const [sectionOpen, setSectionOpen] = useState(true);
     const toggle = (key) => setExpanded((e) => ({ ...e, [key]: !e[key] }));
 
-    const summary = data?.summary || {};
     const allChecks = data?.checks || [];
     const checks = allChecks.filter((c) => matchesStatusFilter(c, statusFilter));
-    const ai = summary.ai || {};
-    const human = summary.human || {};
 
     return (
         <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-
-            {/* Summary cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <StatCard label="Checks" value={summary.distinct_checks ?? 0} accent={accent} />
-                <StatCard label="Total Runs" value={summary.total_runs ?? 0} accent="slate" />
-                <StatCard
-                    label="AI Pass Rate"
-                    value={`${summary.ai_pass_rate ?? 0}%`}
-                    hint={`${ai.pass ?? 0}P / ${ai.fail ?? 0}F / ${ai.warning ?? 0}W`}
-                    accent="blue"
-                />
-                <StatCard
-                    label="Human Reviewed"
-                    value={summary.reviewed_count ?? 0}
-                    hint="runs with feedback"
-                    accent="violet"
-                />
-                <StatCard
-                    label="Human Pass Rate"
-                    value={`${summary.human_pass_rate ?? 0}%`}
-                    hint={`${human.pass ?? 0}P / ${human.fail ?? 0}F / ${human.warning ?? 0}W`}
-                    accent="emerald"
-                />
-                <StatCard label="AI Fails" value={ai.fail ?? 0} accent="rose" />
-            </div>
+            <button
+                onClick={() => setSectionOpen((o) => !o)}
+                className="flex items-center gap-2 text-lg font-bold text-slate-800 hover:text-blue-600 transition-colors"
+            >
+                <span className="text-slate-400 text-base">{sectionOpen ? '▼' : '▶'}</span>
+                {title}
+                <span className="text-xs font-medium text-slate-400">({checks.length})</span>
+            </button>
 
             {/* Check table */}
+            {sectionOpen && (
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                 {checks.length === 0 ? (
                     <div className="p-10 text-center text-sm text-slate-400">
@@ -234,11 +233,10 @@ const SectionBlock = ({ title, geoLabel, data, accent, statusFilter }) => {
                                 <tr>
                                     <th className="px-4 py-3 w-8"></th>
                                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Check</th>
+                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Accuracy</th>
                                     <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{geoLabel}</th>
                                     <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Runs</th>
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-blue-600 uppercase tracking-wider">AI (P/F/W)</th>
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-violet-700 uppercase tracking-wider">Human (P/F/W)</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Reviewed</th>
+                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-violet-700 uppercase tracking-wider">Human Reviewed</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -253,19 +251,19 @@ const SectionBlock = ({ title, geoLabel, data, accent, statusFilter }) => {
                                                     <div className="font-semibold text-slate-800">{c.check_name}</div>
                                                     <div className="text-[11px] text-slate-400">{c.headline}</div>
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-slate-600">{c.geo}</td>
-                                                <td className="px-4 py-3 text-xs text-right text-slate-700 font-semibold">{c.total_runs}</td>
-                                                <td className="px-4 py-3"><CountChips counts={c.ai} /></td>
-                                                <td className="px-4 py-3">
-                                                    {c.reviewed_count > 0
-                                                        ? <CountChips counts={c.human} />
-                                                        : <span className="text-[11px] text-slate-400 italic">—</span>}
+                                                <td className="px-4 py-3 text-xs text-right">
+                                                    <AccuracyCell accuracy={c.accuracy} reviewed={c.reviewed_count} />
                                                 </td>
+                                                <td className="px-4 py-3 text-xs text-slate-600">
+                                                    <div>{c.geo || '—'}</div>
+                                                    {c.geo_state ? <div className="text-[11px] text-slate-400">{c.geo_state}</div> : null}
+                                                </td>
+                                                <td className="px-4 py-3 text-xs text-right text-slate-700 font-semibold">{c.total_runs}</td>
                                                 <td className="px-4 py-3 text-xs text-right text-violet-700 font-semibold">{c.reviewed_count}</td>
                                             </tr>
                                             {open && (
                                                 <tr>
-                                                    <td colSpan={7} className="p-0">
+                                                    <td colSpan={6} className="p-0">
                                                         <RunComparison runs={c.runs} />
                                                     </td>
                                                 </tr>
@@ -278,6 +276,7 @@ const SectionBlock = ({ title, geoLabel, data, accent, statusFilter }) => {
                     </div>
                 )}
             </div>
+            )}
         </div>
     );
 };
@@ -341,8 +340,6 @@ const QCAnalytics = () => {
     const [selectedState, setSelectedState] = useState('');
     const [ahjData, setAhjData] = useState(null);
     const [utilData, setUtilData] = useState(null);
-    const [ahjTrend, setAhjTrend] = useState([]);
-    const [utilTrend, setUtilTrend] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [statusFilter, setStatusFilter] = useState('all');
@@ -352,16 +349,12 @@ const QCAnalytics = () => {
         setError(null);
         const params = { from: toIsoStart(r.from), to: toIsoEnd(r.to) };
         try {
-            const [ahj, util, ahjT, utilT] = await Promise.all([
+            const [ahj, util] = await Promise.all([
                 fetchQCSection({ dimension: 'ahj', state: state || undefined, ...params }),
                 fetchQCSection({ dimension: 'utility', state: state || undefined, ...params }),
-                fetchQCStateTrend({ dimension: 'ahj', ...params }),
-                fetchQCStateTrend({ dimension: 'utility', ...params }),
             ]);
             setAhjData(ahj);
             setUtilData(util);
-            setAhjTrend(ahjT.rows || []);
-            setUtilTrend(utilT.rows || []);
         } catch (e) {
             console.error(e);
             setError(
@@ -478,19 +471,6 @@ const QCAnalytics = () => {
                 <>
                     <SectionBlock title="AHJ Checks" geoLabel="AHJ" data={ahjData} accent="violet" statusFilter={statusFilter} />
                     <SectionBlock title="Utility Checks" geoLabel="Utility" data={utilData} accent="amber" statusFilter={statusFilter} />
-
-                    <div className="space-y-4">
-                        <div>
-                            <h3 className="text-lg font-bold text-slate-800">State Trend</h3>
-                            <p className="text-xs text-slate-500 mt-1">
-                                Which states&apos; checks fail / pass the most (all states, ignores the state filter above).
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <TrendTable title="AHJ — by state" rows={ahjTrend} />
-                            <TrendTable title="Utility — by state" rows={utilTrend} />
-                        </div>
-                    </div>
                 </>
             )}
         </div>

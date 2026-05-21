@@ -107,12 +107,14 @@ const RunComparison = ({ runs }) => {
                 {runs.map((run, idx) => {
                     const human = run.human || {};
                     const ai = run.ai || {};
+                    const files = Array.isArray(run.files) ? run.files : [];
+                    const reasons = Array.isArray(ai.reasons) ? ai.reasons : [];
                     return (
                         <div key={run.run_id || idx} className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                             <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                                 <span className="text-[11px] text-slate-600 font-semibold">{formatDate(run.date)}</span>
                                 <span className="text-[11px] text-slate-500">
-                                    File: {(run.files && run.files.length > 0) ? run.files.join(', ') : '—'}
+                                    File: {files.length > 0 ? files.join(', ') : '—'}
                                 </span>
                                 <span className="text-[11px] text-slate-400">project {run.project_id ?? '—'}</span>
                             </div>
@@ -123,9 +125,11 @@ const RunComparison = ({ runs }) => {
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">AI Response</span>
                                         <StatusBadge status={ai.status} />
                                     </div>
-                                    {(ai.reasons && ai.reasons.length > 0) ? (
+                                    {reasons.length > 0 ? (
                                         <ul className="list-disc list-inside text-[11px] text-slate-600 space-y-0.5">
-                                            {ai.reasons.slice(0, 5).map((r, ri) => <li key={ri}>{r}</li>)}
+                                            {reasons.slice(0, 5).map((r, ri) => (
+                                                <li key={ri}>{typeof r === 'object' ? JSON.stringify(r) : r}</li>
+                                            ))}
                                         </ul>
                                     ) : (
                                         <div className="text-[11px] text-slate-400">No reason provided.</div>
@@ -254,11 +258,8 @@ const GeneralAnalytics = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const summary = data?.summary || {};
     const checks = data?.checks || [];
     const visibleChecks = checks.filter((c) => matchesStatusFilter(c, statusFilter));
-    const ai = summary.ai || {};
-    const human = summary.human || {};
 
     return (
         <div className="space-y-8">
@@ -319,31 +320,6 @@ const GeneralAnalytics = () => {
 
             {!loading && !error && (
                 <>
-                    {/* Summary cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                        <StatCard label="Checks" value={summary.distinct_checks ?? 0} accent="blue" />
-                        <StatCard label="Total Runs" value={summary.total_runs ?? 0} accent="slate" />
-                        <StatCard
-                            label="AI Pass Rate"
-                            value={`${summary.ai_pass_rate ?? 0}%`}
-                            hint={`${ai.pass ?? 0}P / ${ai.fail ?? 0}F / ${ai.warning ?? 0}W`}
-                            accent="blue"
-                        />
-                        <StatCard
-                            label="Human Reviewed"
-                            value={summary.reviewed_count ?? 0}
-                            hint="runs with feedback"
-                            accent="violet"
-                        />
-                        <StatCard
-                            label="Human Pass Rate"
-                            value={`${summary.human_pass_rate ?? 0}%`}
-                            hint={`${human.pass ?? 0}P / ${human.fail ?? 0}F / ${human.warning ?? 0}W`}
-                            accent="emerald"
-                        />
-                        <StatCard label="AI Fails" value={ai.fail ?? 0} accent="rose" />
-                    </div>
-
                     {/* Checks trend */}
                     <ChecksTrend checks={checks} />
 
@@ -371,9 +347,7 @@ const GeneralAnalytics = () => {
                                                 <th className="px-4 py-3 w-8"></th>
                                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Check</th>
                                                 <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Runs</th>
-                                                <th className="px-4 py-3 text-left text-[10px] font-bold text-blue-600 uppercase tracking-wider">AI (P/F/W)</th>
-                                                <th className="px-4 py-3 text-left text-[10px] font-bold text-violet-700 uppercase tracking-wider">Human (P/F/W)</th>
-                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Reviewed</th>
+                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-violet-700 uppercase tracking-wider">Human Reviewed</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -389,17 +363,11 @@ const GeneralAnalytics = () => {
                                                                 <div className="text-[11px] text-slate-400">{c.headline}</div>
                                                             </td>
                                                             <td className="px-4 py-3 text-xs text-right text-slate-700 font-semibold">{c.total_runs}</td>
-                                                            <td className="px-4 py-3"><CountChips counts={c.ai} /></td>
-                                                            <td className="px-4 py-3">
-                                                                {c.reviewed_count > 0
-                                                                    ? <CountChips counts={c.human} />
-                                                                    : <span className="text-[11px] text-slate-400 italic">—</span>}
-                                                            </td>
                                                             <td className="px-4 py-3 text-xs text-right text-violet-700 font-semibold">{c.reviewed_count}</td>
                                                         </tr>
                                                         {open && (
                                                             <tr>
-                                                                <td colSpan={6} className="p-0">
+                                                                <td colSpan={4} className="p-0">
                                                                     <RunComparison runs={c.runs} />
                                                                 </td>
                                                             </tr>

@@ -22,25 +22,26 @@ from fastapi import APIRouter, HTTPException, Query
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/qc-analytics", tags=["QC Analytics Proxy"])
 
-SOLAR_AGENTS_BASE = os.getenv("SOLAR_AGENTS_API_BASE", "").rstrip("/")
-SOLAR_AGENTS_TOKEN = os.getenv("SOLAR_AGENTS_SERVICE_TOKEN", "")
-HTTP_TIMEOUT = float(os.getenv("SOLAR_AGENTS_TIMEOUT_SECS", "45"))
-
-
 async def _forward(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
     """Forward a GET to solar_ai_agents and surface its response or error verbatim."""
-    if not SOLAR_AGENTS_BASE or not SOLAR_AGENTS_TOKEN:
+    # Read env at request time — avoids import-order issues where this module
+    # is imported before load_dotenv() runs in main.py.
+    base = os.getenv("SOLAR_AGENTS_API_BASE", "").rstrip("/")
+    token = os.getenv("SOLAR_AGENTS_SERVICE_TOKEN", "")
+    timeout = float(os.getenv("SOLAR_AGENTS_TIMEOUT_SECS", "45"))
+
+    if not base or not token:
         raise HTTPException(
             status_code=500,
             detail="SOLAR_AGENTS_API_BASE or SOLAR_AGENTS_SERVICE_TOKEN env var is not set.",
         )
 
-    url = f"{SOLAR_AGENTS_BASE}{path}"
-    headers = {"Authorization": f"Bearer {SOLAR_AGENTS_TOKEN}"}
+    url = f"{base}{path}"
+    headers = {"Authorization": f"Bearer {token}"}
     clean_params = {k: v for k, v in (params or {}).items() if v is not None}
 
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             r = await client.get(url, params=clean_params, headers=headers)
     except httpx.RequestError as e:
         logger.error("Upstream unreachable: %s", e)
