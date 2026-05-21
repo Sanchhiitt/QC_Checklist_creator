@@ -69,15 +69,18 @@ const formatDate = (iso) => {
     try { return new Date(iso).toLocaleString(); } catch { return iso; }
 };
 
-// Per-check accuracy — how often AI agreed with the human reviewer.
-// '—' when no run was human-reviewed (can't be measured).
+// Per-check accuracy. A run with no human feedback counts as 100%; a run a
+// human changed (challenged) counts against it.
 const AccuracyCell = ({ accuracy, reviewed }) => {
-    if (accuracy == null || !reviewed) {
-        return <span className="text-slate-300" title="No human review yet">—</span>;
+    if (accuracy == null) {
+        return <span className="text-slate-300">—</span>;
     }
     const color = accuracy >= 80 ? 'text-emerald-700' : accuracy >= 50 ? 'text-amber-700' : 'text-rose-700';
+    const title = reviewed > 0
+        ? `Human gave feedback on ${reviewed} run(s); runs with no feedback count as correct`
+        : 'No human feedback on this check — counted as 100%';
     return (
-        <span className={`font-bold ${color}`} title={`AI matched human on ${reviewed} reviewed run(s)`}>
+        <span className={`font-bold ${color}`} title={title}>
             {accuracy}%
         </span>
     );
@@ -281,6 +284,102 @@ const SectionBlock = ({ title, geoLabel, data, accent, statusFilter }) => {
     );
 };
 
+// ─── Performance matrix — top jurisdictions by accuracy ───────────────────
+// Groups the section's checks by jurisdiction (geo), computes a weighted
+// accuracy (Σ correct ÷ Σ runs), and ranks them. Has its own state filter
+// and a best↔worst sort toggle. Always shows the top 20.
+const PerformanceMatrix = ({ title, geoLabel, data }) => {
+    const [stateFilter, setStateFilter] = useState('all');
+    const [sortDir, setSortDir] = useState('best'); // 'best' = best→worst
+
+    const checks = data?.checks || [];
+
+    const states = useMemo(() => {
+        const s = new Set();
+        for (const c of checks) if (c.geo_state) s.add(c.geo_state);
+        return [...s].sort();
+    }, [checks]);
+
+    const rows = useMemo(() => {
+        const map = {};
+        for (const c of checks) {
+            if (!c.geo) continue;
+            if (stateFilter !== 'all' && (c.geo_state || '') !== stateFilter) continue;
+            if (!map[c.geo]) {
+                map[c.geo] = { geo: c.geo, state: c.geo_state || '—', correct: 0, total: 0, checks: 0 };
+            }
+            map[c.geo].correct += c.correct_count || 0;
+            map[c.geo].total += c.total_runs || 0;
+            map[c.geo].checks += 1;
+        }
+        const arr = Object.values(map).map((r) => ({
+            ...r,
+            accuracy: r.total > 0 ? Math.round((r.correct * 10000) / r.total) / 100 : 0,
+        }));
+        arr.sort((a, b) => (sortDir === 'best' ? b.accuracy - a.accuracy : a.accuracy - b.accuracy));
+        return arr.slice(0, 20);
+    }, [checks, stateFilter, sortDir]);
+
+    return (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">{title}</h3>
+                <div className="flex items-center gap-2">
+                    <select
+                        value={stateFilter}
+                        onChange={(e) => setStateFilter(e.target.value)}
+                        className="text-xs border border-slate-200 rounded-lg px-2 py-1.5"
+                    >
+                        <option value="all">All states</option>
+                        {states.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <button
+                        onClick={() => setSortDir((d) => (d === 'best' ? 'worst' : 'best'))}
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        title="Toggle sort order"
+                    >
+                        {sortDir === 'best' ? 'Best → Worst' : 'Worst → Best'}
+                    </button>
+                </div>
+            </div>
+            {rows.length === 0 ? (
+                <div className="p-8 text-center text-sm text-slate-400">No {geoLabel} data.</div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-100">
+                        <thead className="bg-slate-50">
+                            <tr>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider w-10">#</th>
+                                <th className="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{geoLabel}</th>
+                                <th className="px-4 py-2 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Runs</th>
+                                <th className="px-4 py-2 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Accuracy</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {rows.map((r, idx) => {
+                                const color = r.accuracy >= 80 ? 'text-emerald-700' : r.accuracy >= 50 ? 'text-amber-700' : 'text-rose-700';
+                                return (
+                                    <tr key={r.geo} className="hover:bg-slate-50">
+                                        <td className="px-4 py-2.5 text-xs font-bold text-slate-400">{idx + 1}</td>
+                                        <td className="px-4 py-2.5 text-xs">
+                                            <div className="font-semibold text-slate-800">{r.geo}</div>
+                                            <div className="text-[11px] text-slate-400">
+                                                {r.state} · {r.checks} check{r.checks > 1 ? 's' : ''}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-xs text-right text-slate-600 font-semibold">{r.total}</td>
+                                        <td className={`px-4 py-2.5 text-xs text-right font-bold ${color}`}>{r.accuracy}%</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ─── State-trend table ────────────────────────────────────────────────────
 const TrendTable = ({ title, rows }) => (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -340,6 +439,8 @@ const QCAnalytics = () => {
     const [selectedState, setSelectedState] = useState('');
     const [ahjData, setAhjData] = useState(null);
     const [utilData, setUtilData] = useState(null);
+    const [matrixAhj, setMatrixAhj] = useState(null);
+    const [matrixUtil, setMatrixUtil] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [statusFilter, setStatusFilter] = useState('all');
@@ -349,12 +450,18 @@ const QCAnalytics = () => {
         setError(null);
         const params = { from: toIsoStart(r.from), to: toIsoEnd(r.to) };
         try {
-            const [ahj, util] = await Promise.all([
+            const [ahj, util, ahjAll, utilAll] = await Promise.all([
                 fetchQCSection({ dimension: 'ahj', state: state || undefined, ...params }),
                 fetchQCSection({ dimension: 'utility', state: state || undefined, ...params }),
+                // The performance matrix always spans every state, regardless
+                // of the page's state filter — fetch all-states data for it.
+                state ? fetchQCSection({ dimension: 'ahj', ...params }) : Promise.resolve(null),
+                state ? fetchQCSection({ dimension: 'utility', ...params }) : Promise.resolve(null),
             ]);
             setAhjData(ahj);
             setUtilData(util);
+            setMatrixAhj(ahjAll || ahj);
+            setMatrixUtil(utilAll || util);
         } catch (e) {
             console.error(e);
             setError(
@@ -439,6 +546,22 @@ const QCAnalytics = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Performance matrix — top jurisdictions by accuracy */}
+            {!loading && !error && (
+                <div className="space-y-3">
+                    <div className="px-2">
+                        <h3 className="text-lg font-bold text-slate-800">Performance Matrix</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Top 20 jurisdictions by accuracy — spans all states; filter &amp; sort inside each box.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <PerformanceMatrix title="AHJ Performance" geoLabel="AHJ" data={matrixAhj} />
+                        <PerformanceMatrix title="Utility Performance" geoLabel="Utility" data={matrixUtil} />
+                    </div>
+                </div>
+            )}
 
             {/* Status filter — instant, client-side */}
             {!loading && !error && (

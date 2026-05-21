@@ -52,6 +52,23 @@ const formatDate = (iso) => {
     try { return new Date(iso).toLocaleString(); } catch { return iso; }
 };
 
+// Per-check accuracy. A run with no human feedback counts as 100%; a run a
+// human challenged (left feedback on) counts against it.
+const AccuracyCell = ({ accuracy, reviewed }) => {
+    if (accuracy == null) {
+        return <span className="text-slate-300">—</span>;
+    }
+    const color = accuracy >= 80 ? 'text-emerald-700' : accuracy >= 50 ? 'text-amber-700' : 'text-rose-700';
+    const title = reviewed > 0
+        ? `Human challenged ${reviewed} run(s); runs with no feedback count as correct`
+        : 'No human feedback on this check — counted as 100%';
+    return (
+        <span className={`font-bold ${color}`} title={title}>
+            {accuracy}%
+        </span>
+    );
+};
+
 const CountChips = ({ counts }) => (
     <div className="flex gap-1">
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">{counts?.pass ?? 0}P</span>
@@ -346,6 +363,7 @@ const GeneralAnalytics = () => {
                                             <tr>
                                                 <th className="px-4 py-3 w-8"></th>
                                                 <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Check</th>
+                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Accuracy</th>
                                                 <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Runs</th>
                                                 <th className="px-4 py-3 text-right text-[10px] font-bold text-violet-700 uppercase tracking-wider">Human Reviewed</th>
                                             </tr>
@@ -362,12 +380,15 @@ const GeneralAnalytics = () => {
                                                                 <div className="font-semibold text-slate-800">{c.check_name}</div>
                                                                 <div className="text-[11px] text-slate-400">{c.headline}</div>
                                                             </td>
+                                                            <td className="px-4 py-3 text-xs text-right">
+                                                                <AccuracyCell accuracy={c.accuracy} reviewed={c.reviewed_count} />
+                                                            </td>
                                                             <td className="px-4 py-3 text-xs text-right text-slate-700 font-semibold">{c.total_runs}</td>
                                                             <td className="px-4 py-3 text-xs text-right text-violet-700 font-semibold">{c.reviewed_count}</td>
                                                         </tr>
                                                         {open && (
                                                             <tr>
-                                                                <td colSpan={4} className="p-0">
+                                                                <td colSpan={5} className="p-0">
                                                                     <RunComparison runs={c.runs} />
                                                                 </td>
                                                             </tr>
