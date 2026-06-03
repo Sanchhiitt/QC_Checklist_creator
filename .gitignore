@@ -1,3 +1,7 @@
+# Service account / secrets
+service_account_key.json
+*service*account*.json
+
 # Environment Variables
 .env
 .env.local
@@ -35,3 +39,7 @@ Thumbs.db
 # Logs and databases
 *.log
 *.sqlite
+
+# Data / enrichment inputs & outputs
+input/
+*.cache.jsonl
