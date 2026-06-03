@@ -15,10 +15,9 @@ def _get_client() -> genai.Client:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment variables")
-    return genai.Client(
-        api_key=api_key,
-        http_options=types.HttpOptions(api_version="v1"),
-    )
+    # Default API version (v1beta) — required for thinking_config / ThinkingConfig,
+    # which the v1 endpoint does not yet accept.
+    return genai.Client(api_key=api_key)
 
 
 SAFETY_SETTINGS = [
