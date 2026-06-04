@@ -6,3 +6,4 @@ google-genai
 pydantic
 pymongo
 httpx
+langsmith>=0.1.0
