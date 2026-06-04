@@ -53,6 +53,26 @@ def traced_llm(name: str, model: str = "", provider: str = "google_genai") -> Ca
     return _ls_traceable(name=name, run_type="llm", metadata=metadata)
 
 
+def traced_process(name: str) -> Callable:
+    """Decorator: marks a function as a TOP-LEVEL process root in LangSmith.
+
+    LangSmith bills ONE trace per root run. Any nested @traced_llm calls inside
+    this function become CHILD SPANS of the same root trace — they do NOT
+    count as separate billable traces.
+
+    Use this on the user-facing endpoint handler so that
+    "user hit -> output returned" = one trace, regardless of how many internal
+    Gemini calls happen along the way. Important for the free tier (5,000
+    traces / month).
+
+    When tracing is off this returns the function unchanged."""
+    if not _TRACING_ON:
+        def _noop(fn):
+            return fn
+        return _noop
+    return _ls_traceable(name=name, run_type="chain")
+
+
 def record_gemini_usage(response: Any, model: str = "") -> None:
     """Attach a Gemini response's token usage to the active LangSmith run.
 
