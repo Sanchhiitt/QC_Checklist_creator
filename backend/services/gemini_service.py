@@ -3,10 +3,15 @@ from google.genai import types
 import os
 from typing import List
 from models import QCCheck
+from services.observability import traced_llm, record_gemini_usage
 
 # Thinking budget (tokens the model may spend reasoning before answering).
 # gemini-2.5-flash accepts: -1 = dynamic, 0 = off, or 1..24576 = fixed cap.
 THINKING_BUDGET = 1
+
+# Model used by both endpoints — kept in one place so the LangSmith
+# decorators, record_gemini_usage calls, and generate_content calls stay in sync.
+_GEMINI_MODEL = "gemini-2.5-flash"
 
 
 def _get_client() -> genai.Client:
@@ -55,6 +60,7 @@ QC Prompt: Verify the presence of a note specifying that workspace in front of A
 Category: General Notes
 """
 
+@traced_llm("gemini_generate_checks", model=_GEMINI_MODEL)
 def generate_checks(raw_text: str, state: str = None, jurisdiction_type: str = None, jurisdiction_name: str = None) -> List[QCCheck]:
     client = _get_client()
 
@@ -63,7 +69,7 @@ def generate_checks(raw_text: str, state: str = None, jurisdiction_type: str = N
     )
 
     response = client.models.generate_content(
-        model='gemini-2.5-flash',
+        model=_GEMINI_MODEL,
         contents=prompt,
         config=types.GenerateContentConfig(
             candidate_count=1,
@@ -72,9 +78,12 @@ def generate_checks(raw_text: str, state: str = None, jurisdiction_type: str = N
             thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET),
         ),
     )
+    # Forward Gemini's usage_metadata to LangSmith for cost tracking.
+    record_gemini_usage(response, model=_GEMINI_MODEL)
 
     return parse_gemini_response(response.text)
 
+@traced_llm("gemini_regenerate_prompt", model=_GEMINI_MODEL)
 def regenerate_prompt(current_prompt: str, user_instruction: str) -> str:
     client = _get_client()
 
@@ -91,7 +100,7 @@ def regenerate_prompt(current_prompt: str, user_instruction: str) -> str:
     """
 
     response = client.models.generate_content(
-        model='gemini-2.5-flash',
+        model=_GEMINI_MODEL,
         contents=prompt,
         config=types.GenerateContentConfig(
             candidate_count=1,
@@ -99,6 +108,8 @@ def regenerate_prompt(current_prompt: str, user_instruction: str) -> str:
             thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET),
         ),
     )
+    # Forward Gemini's usage_metadata to LangSmith for cost tracking.
+    record_gemini_usage(response, model=_GEMINI_MODEL)
 
     return response.text.strip()
 

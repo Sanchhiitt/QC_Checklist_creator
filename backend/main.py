@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from models import JurisdictionRequest, QCRequest, QCCheck, RegenerateRequest, UpdateCheckRequest
 from services import gemini_service, db_service
+from services.observability import traced_process
 from proxy_routes import router as qc_analytics_proxy_router
 
 load_dotenv()
@@ -45,6 +46,7 @@ def get_jurisdictions():
     return JURISDICTIONS
 
 @app.post("/api/generate-checks")
+@traced_process("qc_checklist.generate_checks_request")
 def generate_checks(request: QCRequest):
     checks = gemini_service.generate_checks(
         request.raw_text,
@@ -70,6 +72,7 @@ def generate_checks(request: QCRequest):
     return {"session_id": session_id, "checks": checks_payload}
 
 @app.post("/api/regenerate-prompt")
+@traced_process("qc_checklist.regenerate_prompt_request")
 def regenerate_prompt(request: RegenerateRequest):
     new_prompt = gemini_service.regenerate_prompt(
         request.current_prompt,
