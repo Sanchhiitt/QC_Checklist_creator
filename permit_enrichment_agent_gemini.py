@@ -73,10 +73,10 @@ SHEET   = "utility"                                     # "utility"  or  "ahj"
 INPUT   = "input/Permitting Application - Utility.csv"  # path to your CSV
 OUTPUT  = "Utility_enriched.csv"                        # where results go
 
-LIMIT   = 5         # how many UNIQUE entities to research. 0 = ALL (~5,100)
+LIMIT   = 0         # how many UNIQUE entities to research. 0 = ALL (~5,100)
 DRY_RUN = False     # True = show dedup + cost estimate only, NO API calls
 
-WORKERS = 3         # parallel API calls. Faster: 8–10. If many
+WORKERS = 10         # parallel API calls. Faster: 8–10. If many
                     # "429 / RESOURCE_EXHAUSTED" warnings, drop back to ~5.
 MODEL   = "gemini-3.5-flash"     # default. Stronger reasoning: "gemini-3.1-pro-preview"
                                  # Cheaper: "gemini-3.1-flash-lite"

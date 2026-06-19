@@ -4,6 +4,7 @@ import ChecksTable from './components/ChecksTable';
 import Dashboard from './components/Dashboard';
 import QCAnalytics from './components/QCAnalytics';
 import GeneralAnalytics from './components/GeneralAnalytics';
+import RunLog from './components/RunLog';
 import { generateChecks } from './api';
 
 function App() {
@@ -11,7 +12,7 @@ function App() {
     const [sessionId, setSessionId] = useState(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState(null);
-    const [view, setView] = useState('generator'); // 'generator' | 'dashboard' | 'analytics' | 'general'
+    const [view, setView] = useState('generator'); // 'generator' | 'dashboard' | 'analytics' | 'general' | 'runlog'
 
     const handleUpdateCheck = (index, updatedCheck) => {
         const newChecks = [...checks];
@@ -79,6 +80,12 @@ function App() {
                         >
                             General Checks
                         </button>
+                        <button
+                            onClick={() => setView('runlog')}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${view === 'runlog' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                        >
+                            Run Log
+                        </button>
                         <span className="hidden md:inline text-xs font-medium text-blue-600 italic ml-2">v2.1</span>
                     </div>
                 </div>
@@ -118,6 +125,7 @@ function App() {
                 {view === 'dashboard' && <Dashboard />}
                 {view === 'analytics' && <QCAnalytics />}
                 {view === 'general' && <GeneralAnalytics />}
+                {view === 'runlog' && <RunLog />}
             </div>
 
             <footer className="mt-20 py-8 border-t border-slate-200 text-center text-slate-400 text-xs">
