@@ -19,6 +19,15 @@ from typing import Any, Dict, Optional
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 
+# WHICH ANALYTICS ROUTER TO TALK TO.
+#
+# solar_ai_agents mounts TWO analytics routers at different prefixes — the V1
+# agent's under /api/v1 and the V2 agent's under /api/v2 — and they expose the
+# SAME four paths. This dashboard reports on Quality Check V2, so it must ask
+# /api/v2; pointed at /api/v1 it silently returns V1's numbers instead, which
+# look plausible and are about a different agent entirely.
+_API_VERSION = os.getenv("SOLAR_AGENTS_API_VERSION", "/api/v2").rstrip("/")
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/qc-analytics", tags=["QC Analytics Proxy"])
 
@@ -58,7 +67,7 @@ async def states(
     date_from: Optional[str] = Query(None, alias="from"),
     date_to: Optional[str] = Query(None, alias="to"),
 ):
-    return await _forward("/api/v1/qc/analytics/states", {"from": date_from, "to": date_to})
+    return await _forward(f"{_API_VERSION}/qc/analytics/states", {"from": date_from, "to": date_to})
 
 
 @router.get("/section")
@@ -68,7 +77,7 @@ async def section(
     date_from: Optional[str] = Query(None, alias="from"),
     date_to: Optional[str] = Query(None, alias="to"),
 ):
-    return await _forward("/api/v1/qc/analytics/section", {
+    return await _forward(f"{_API_VERSION}/qc/analytics/section", {
         "dimension": dimension, "state": state, "from": date_from, "to": date_to,
     })
 
@@ -79,7 +88,7 @@ async def state_trend(
     date_from: Optional[str] = Query(None, alias="from"),
     date_to: Optional[str] = Query(None, alias="to"),
 ):
-    return await _forward("/api/v1/qc/analytics/state-trend", {
+    return await _forward(f"{_API_VERSION}/qc/analytics/state-trend", {
         "dimension": dimension, "from": date_from, "to": date_to,
     })
 
@@ -89,6 +98,6 @@ async def general_section(
     date_from: Optional[str] = Query(None, alias="from"),
     date_to: Optional[str] = Query(None, alias="to"),
 ):
-    return await _forward("/api/v1/qc/analytics/general/section", {
+    return await _forward(f"{_API_VERSION}/qc/analytics/general/section", {
         "from": date_from, "to": date_to,
     })
